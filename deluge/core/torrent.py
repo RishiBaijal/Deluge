@@ -182,10 +182,10 @@ class Torrent(object):
         # Various torrent options
         self.handle.resolve_countries(True)
 
-        self.set_options(self.options)
-
         # Status message holds error info about the torrent
         self.statusmsg = "OK"
+
+        self.set_options(self.options)
 
         # The torrent's state
         self.state = None
@@ -454,6 +454,9 @@ class Torrent(object):
 
         # First we check for an error from libtorrent, and set the state to that
         # if any occurred.
+
+
+
         if len(status.error) > 0:
             # This is an error'd torrent
             self.state = "Error"
@@ -461,8 +464,14 @@ class Torrent(object):
             if status.paused:
                 self.handle.auto_managed(False)
             return
+        elif self.statusmsg.startswith("Error:"):
+            self.state = "Error"
+            if status.paused:
+                self.handle.auto_managed(False)
+            return
         else:
             self.set_status_message("OK")
+
 
         if ltstate == LTSTATE["Queued"] or ltstate == LTSTATE["Checking"]:
             if status.paused:
