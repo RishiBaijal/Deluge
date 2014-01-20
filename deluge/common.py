@@ -284,12 +284,14 @@ def translate_size_units():
     gib_txt = _("GiB")
 
 
-def fsize(fsize_b):
+def fsize(fsize_b, precision=1):
     """
     Formats the bytes value into a string with KiB, MiB or GiB units
 
     :param fsize_b: the filesize in bytes
     :type fsize_b: int
+    :param precision: the filesize float precision
+    :type precision: int
     :returns: formatted string in KiB, MiB or GiB units
     :rtype: string
 
@@ -297,52 +299,62 @@ def fsize(fsize_b):
 
     >>> fsize(112245)
     '109.6 KiB'
+    >>> fsize(112245, precision=0)
+    '110 KiB'
 
     """
     # Bigger than 1 GiB
-    if (fsize_b >= 1073741824):
-        return "%.1f %s" % (fsize_b / 1073741824.0, gib_txt)
+    if (fsize_b == 0):
+        return "0"
+    elif (fsize_b >= 1073741824):
+        return "%.*f %s" % (precision, fsize_b / 1073741824.0, gib_txt)
     # Bigger than 1 MiB
     elif (fsize_b >= 1048576):
-        return "%.1f %s" % (fsize_b / 1048576.0, mib_txt)
+        return "%.*f %s" % (precision, fsize_b / 1048576.0, mib_txt)
     # Bigger than 1 KiB
     elif (fsize_b >= 1024):
-        return "%.1f %s" % (fsize_b / 1024.0, kib_txt)
+        return "%.*f %s" % (precision, fsize_b / 1024.0, kib_txt)
     else:
         return "%d %s" % (fsize_b, byte_txt)
 
 
-def fsize_short(fsize_b):
+def fsize_short(fsize_b, precision=0):
     """
     Formats the bytes value into a string with K, M or G units
 
     :param fsize_b: the filesize in bytes
     :type fsize_b: int
+    :param precision: the filesize float precision
+    :type precision: int
     :returns: formatted string in K, M or G units
     :rtype: string
 
     **Usage**
 
-    >>> fsize(112245)
+    >>> fsize_short(112245)
+    '110 K'
+    >>> fsize_short(112245, precision=1)
     '109.6 K'
 
     """
     fsize_kb = fsize_b / 1024.0
     if fsize_kb < 1024:
-        return "%.1f %s" % (fsize_kb, _("K"))
+        return "%.*f %s" % (precision, fsize_kb, _("K"))
     fsize_mb = fsize_kb / 1024.0
     if fsize_mb < 1024:
-        return "%.1f %s" % (fsize_mb, _("M"))
+        return "%.*f %s" % (precision, fsize_mb, _("M"))
     fsize_gb = fsize_mb / 1024.0
-    return "%.1f %s" % (fsize_gb, _("G"))
+    return "%.*f %s" % (precision, fsize_gb, _("G"))
 
 
-def fpcnt(dec):
+def fpcnt(dec, precision=2):
     """
     Formats a string to display a percentage with two decimal places
 
     :param dec: the ratio in the range [0.0, 1.0]
     :type dec: float
+    :param precision: the percentage float precision
+    :type precision: int
     :returns: a formatted string representing a percentage
     :rtype: string
 
@@ -350,12 +362,17 @@ def fpcnt(dec):
 
     >>> fpcnt(0.9311)
     '93.11%'
+    >>> fpcnt(0.9311, precision=0)
+    '93%'
 
     """
-    return '%.2f%%' % (dec * 100)
+    pcnt = (dec * 100)
+    if pcnt == 0 or pcnt == 100:
+        precision = 0
+    return '%.*f%%' % (precision, pcnt)
 
 
-def fspeed(bps):
+def fspeed(bps, precision=1):
     """
     Formats a string to display a transfer speed utilizing :func:`fsize`
 
@@ -370,15 +387,42 @@ def fspeed(bps):
     '42.1 KiB/s'
 
     """
+    if bps == 0:
+        return "0"
     fspeed_kb = bps / 1024.0
     if fspeed_kb < 1024:
-        return "%.1f %s" % (fspeed_kb, _("KiB/s"))
+        return "%.*f %s" % (precision, fspeed_kb, _("KiB/s"))
     fspeed_mb = fspeed_kb / 1024.0
     if fspeed_mb < 1024:
-        return "%.1f %s" % (fspeed_mb, _("MiB/s"))
+        return "%.*f %s" % (precision, fspeed_mb, _("MiB/s"))
     fspeed_gb = fspeed_mb / 1024.0
-    return "%.1f %s" % (fspeed_gb, _("GiB/s"))
+    return "%.*f %s" % (precision, fspeed_gb, _("GiB/s"))
 
+def fspeed_short(precision=0):
+    """
+    Formats a string to display a transfer speed utilizing :func:`fsize`
+
+    :param bps: bytes per second
+    :type bps: int
+    :returns: a formatted string representing transfer speed
+    :rtype: string
+
+    **Usage**
+
+    >>> fspeed(43134)
+    '42.1 K/s'
+
+    """
+    if bps == 0:
+        return "0"
+    fspeed_kb = bps / 1024.0
+    if fspeed_kb < 1024:
+        return "%.*f %s" % (precision, fspeed_kb, _("K/s"))
+    fspeed_mb = fspeed_kb / 1024.0
+    if fspeed_mb < 1024:
+        return "%.*f %s" % (precision, fspeed_mb, _("M/s"))
+    fspeed_gb = fspeed_mb / 1024.0
+    return "%.*f %s" % (precision, fspeed_gb, _("G/s"))
 
 def fpeer(num_peers, total_peers):
     """
