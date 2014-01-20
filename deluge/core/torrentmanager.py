@@ -1187,13 +1187,12 @@ class TorrentManager(component.Component):
         if alert.warning_code == lt.performance_warning_t.send_buffer_watermark_too_low:
             max_send_buffer_watermark = 3 * 1024 * 1024  # 3MiB
             settings = self.session.get_settings()
-            send_buffer_watermark = settings.send_buffer_watermark
+            send_buffer_watermark = settings["send_buffer_watermark"]
 
-            log.debug("send_buffer_watermark currently set to: %s Bytes", send_buffer_watermark)
             # If send buffer is too small, try increasing its size by 512KiB (up to max_send_buffer_watermark)
             if send_buffer_watermark < max_send_buffer_watermark:
                 value = send_buffer_watermark + (500 * 1024)
-                log.debug("Setting send_buffer_watermark to: %s Bytes", value)
+                log.info("Increasing send_buffer_watermark from %s to %s Bytes", send_buffer_watermark, value)
                 settings["send_buffer_watermark"] = value
                 self.session.set_settings(settings)
             else:
