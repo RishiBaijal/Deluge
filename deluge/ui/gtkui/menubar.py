@@ -422,36 +422,39 @@ class MenuBar(component.Component):
 
     def on_menuitem_set_other(self, widget):
         log.debug("widget.name: %s", widget.name)
-        funcs = {
-            "menuitem_down_speed": client.core.set_torrent_max_download_speed,
-            "menuitem_up_speed": client.core.set_torrent_max_upload_speed,
-            "menuitem_max_connections": client.core.set_torrent_max_connections,
-            "menuitem_upload_slots": client.core.set_torrent_max_upload_slots
-        }
-        # widget: (header, type_str, image_stockid, image_filename, default)
-        other_dialog_info = {
-            "menuitem_down_speed": (
-                _("Set Maximum Download Speed"),
-                _("KiB/s"), None, "downloading.svg", -1.0
-            ),
-            "menuitem_up_speed": (
-                _("Set Maximum Upload Speed"),
-                _("KiB/s"), None, "seeding.svg", -1.0
-            ),
-            "menuitem_max_connections": (
-                _("Set Maximum Connections"), "", gtk.STOCK_NETWORK, None, -1
-            ),
-            "menuitem_upload_slots": (
-                _("Set Maximum Upload Slots"),
-                "", gtk.STOCK_SORT_ASCENDING, None, -1
-            )
+        status_map = {
+            "menuitem_down_speed": "max_download_speed",
+            "menuitem_up_speed": "max_upload_speed",
+            "menuitem_max_connections": "max_connections",
+            "menuitem_upload_slots": "max_upload_slots"
         }
 
-        # Show the other dialog
-        value = common.show_other_dialog(*other_dialog_info[widget.name])
-        if value and widget.name in funcs:
-            for torrent in component.get("TorrentView").get_selected_torrents():
-                funcs[widget.name](torrent, value)
+        other_dialog_info = {
+            "menuitem_down_speed": [_("Set Maximum Download Speed"), _("KiB/s"), None, "downloading.svg", -1.0],
+            "menuitem_up_speed": [_("Set Maximum Upload Speed"), _("KiB/s"), None, "seeding.svg", -1.0],
+            "menuitem_max_connections": [_("Set Maximum Connections"), "", gtk.STOCK_NETWORK, None, -1],
+            "menuitem_upload_slots": [_("Set Maximum Upload Slots"), "", gtk.STOCK_SORT_ASCENDING, None, -1]
+        }
+
+        status_key = status_map[widget.name]
+        def _on_torrent_status(status):
+            # widget: [header, type_str, image_stockid, image_filename, default]
+            other_dialog = other_dialog_info[widget.name]
+            # Update the default with value from status and show the other dialog
+            other_dialog[4] = status[status_key]
+            def on_value(value):
+                if value and widget.name in status_map:
+                    client.core.set_torrent_options(torrent_ids, {status_key:value})
+            common.show_other_dialog(*other_dialog).addCallback(on_value)
+
+        torrent_ids = component.get("TorrentView").get_selected_torrents()
+        if len(torrent_ids) == 1:
+            d = component.get("SessionProxy").get_torrent_status(torrent_ids[0], status_key)
+        else:
+            log.error("else")
+            d = client.core.get_config_value(status_key)
+        d.addCallback(_on_torrent_status)
+
 
     def on_menuitem_set_automanaged_on(self, widget):
         for torrent in component.get("TorrentView").get_selected_torrents():
