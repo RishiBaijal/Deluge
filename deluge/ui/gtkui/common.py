@@ -182,16 +182,21 @@ def show_other_dialog(header, type_str, image_stockid=None, image_filename=None,
     spinbutton.set_value(default)
     spinbutton.select_region(0, -1)
 
-    value = None
-    response = dialog.run()
-    if response == gtk.RESPONSE_OK:
-        if type(default) == int:
-            value = spinbutton.get_value_as_int()
-        else:
-            value = spinbutton.get_value()
+    from twisted.internet import defer
+    result = defer.Deferred()
+    def response(dialog, response_id):
+        if response_id == gtk.RESPONSE_OK:
+            if type(default) == int:
+                value = spinbutton.get_value_as_int()
+            else:
+                value = spinbutton.get_value()
 
-    dialog.destroy()
-    return value
+        dialog.destroy()
+        result.callback(value)
+        return False
+    dialog.connect("response", response)
+    dialog.show_all()
+    return result
 
 def reparent_iter(treestore, itr, parent, move_siblings=False):
     """
