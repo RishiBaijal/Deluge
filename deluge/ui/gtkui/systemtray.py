@@ -414,18 +414,20 @@ class SystemTray(component.Component):
 
     def setbwlimit(self, widget, string, core_key, ui_key, default, image):
         """Sets the bandwidth limit based on the user selection."""
-        value = widget.get_children()[0].get_text().split(" ")[0]
-        log.debug('setbwlimit: %s', value)
-        if widget.get_name() == "unlimited":
-            value = -1
-        if widget.get_name() == "other":
-            value = common.show_other_dialog(string, _("KiB/s"), None, image, default)
+        def set_value(value):
+            log.debug('setbwlimit: %s', value)
             if value == None:
                 return
             elif value == 0:
                 value = -1
-        # Set the config in the core
-        client.core.set_config({core_key: value})
+            # Set the config in the core
+            client.core.set_config({core_key: value})
+        if widget.get_name() == "unlimited":
+            set_value(-1)
+        elif widget.get_name() == "other":
+            common.show_other_dialog(string, _("KiB/s"), None, image, default).addCallback(set_value)
+        else:
+            set_value(widget.get_children()[0].get_text().split(" ")[0])
 
     def unlock_tray(self, is_showing_dlg=[False]):
         try:

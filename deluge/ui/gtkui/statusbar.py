@@ -395,22 +395,22 @@ class StatusBar(component.Component):
 
     def _on_set_download_speed(self, widget):
         log.debug("_on_set_download_speed")
-
-        if widget.get_name() == "unlimited":
-            value = -1
-        elif widget.get_name() == "other":
-            value = common.show_other_dialog(
-                _("Set Maximum Download Speed"), _("KiB/s"), None, "downloading.svg", self.max_download_speed)
+        def set_value(value):
+            log.debug('value: %s', value)
             if value is None:
                 return
+            elif value == 0:
+                value = -1
+            # Set the config in the core
+            if value != self.max_download_speed:
+                client.core.set_config({"max_download_speed": value})
+        if widget.get_name() == "unlimited":
+            set_value(-1)
+        elif widget.get_name() == "other":
+            common.show_other_dialog(_("Set Maximum Download Speed"), _("KiB/s"), None,
+                                     "downloading.svg", self.max_download_speed).addCallback(set_value)
         else:
-            value = float(widget.get_children()[0].get_text().split(" ")[0])
-
-        log.debug("value: %s", value)
-
-        # Set the config in the core
-        if value != self.max_download_speed:
-            client.core.set_config({"max_download_speed": value})
+            set_value(float(widget.get_children()[0].get_text().split(" ")[0]))
 
     def _on_upload_item_clicked(self, widget, event):
         menu = common.build_menu_radio_list(
