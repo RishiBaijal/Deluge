@@ -196,7 +196,8 @@ class Torrent(object):
         options (dict): The torrent options.
         filename (str): The filename of the torrent file in case it is required.
         is_finished (bool): Keep track if torrent is finished to prevent some weird things on state load.
-        statusmsg (str): Status message holds error info about the torrent
+        error_statusmsg (str): Holds the error status message, used for setting error state.
+        statusmsg (str): Status message holds error/extra info about the torrent.
         state (str): The torrent's state
         trackers (list of dict): The torrent's trackers
         tracker_status (str): Status message of currently connected tracker
@@ -250,7 +251,7 @@ class Torrent(object):
                 self.filename = filename
             self.error_statusmsg = None
 
-        self.statusmsg = "OK"
+        self.statusmsg = None
         self.state = None
         self.moving_storage = False
         self.moving_storage_dest_path = None
@@ -608,18 +609,16 @@ class Torrent(object):
 
         if status.error or self.error_statusmsg:
             self.state = "Error"
-            # This will be reverted upon resuming.
+            # auto-manage status will be reverted upon resuming.
             self.handle.auto_managed(False)
-            if not status.paused:
-                self.handle.pause()
-
             if status.error:
-                self.set_error_statusmsg(decode_string(status.error))
-                log.debug("Error state from lt: %s", self.error_statusmsg)
+                self.error_statusmsg = decode_string(status.error)
             else:
-                # As this is not a libtorrent Error we should emit a state changed event
+                # This is not an lt Error so pause (save original status) and emit a state changed event.
+                self.options["add_paused"] = status.paused
+                if not status.paused:
+                    self.handle.pause()
                 component.get("EventManager").emit(TorrentStateChangedEvent(self.torrent_id, "Error"))
-                log.debug("Error state forced by Deluge, error_statusmsg: %s", self.error_statusmsg)
             self.set_status_message(self.error_statusmsg)
         elif self.moving_storage:
             self.state = "Moving"
@@ -633,28 +632,33 @@ class Torrent(object):
         if log.isEnabledFor(logging.DEBUG):
             log.debug("State from lt was: %s | Session is paused: %s", status.state, session_is_paused)
             log.debug("Torrent state set to '%s' (%s)", self.state, self.torrent_id)
+            if self.error_statusmsg:
+                log.debug("Torrent Error state message: %s", self.error_statusmsg)
 
-    def set_status_message(self, message):
+    def set_status_message(self, message=None):
         """Sets the torrent status message.
 
+        Calling method without a message will reset the message to 'OK'.
+
         Args:
-            message (str): The status message.
+            message (str, optional): The status message.
 
         """
+        if not message:
+            message = "OK"
         self.statusmsg = message
 
-    def set_error_statusmsg(self, message):
-        """Sets the torrent error status message.
+    def force_error_state(self, message):
+        """Forces the torrent into an error state.
 
-        Note:
-            This will force a torrent into an error state. It is used for
-            setting those errors that are not covered by libtorrent.
+        For setting an error state not covered by libtorrent.
 
         Args:
             message (str): The error status message.
 
         """
         self.error_statusmsg = message
+        self.update_state()
 
     def get_eta(self):
         """Get the ETA for this torrent.
@@ -1032,28 +1036,25 @@ class Torrent(object):
     def resume(self):
         """Resumes this torrent."""
         if self.status.paused and self.status.auto_managed:
-            log.debug("Torrent is being auto-managed, cannot resume!")
-            return
+            log.debug("Resume not possible for auto-managed torrent!")
+        elif self.error_statusmsg and self.options["add_paused"]:
+            log.debug("Resume skipped for error'd torrent as it was originally paused.")
+        elif (self.status.is_finished and self.options["stop_at_ratio"] and
+                self.get_ratio() >= self.options["stop_ratio"]):
+            log.debug("Resume skipped for torrent as it has reached 'stop_seed_ratio'.")
+        else:
+            # Check if torrent was originally being auto-managed.
+            if self.options["auto_managed"]:
+                self.handle.auto_managed(True)
+            try:
+                self.handle.resume()
+            except RuntimeError, ex:
+                log.debug("Unable to resume torrent: %s", ex)
 
         # Reset the status message just in case of resuming an Error'd torrent
-        self.set_status_message("OK")
-        self.set_error_statusmsg(None)
-
-        if self.status.is_finished:
-            # If the torrent has already reached it's 'stop_seed_ratio' then do not do anything
-            if self.options["stop_at_ratio"]:
-                if self.get_ratio() >= self.options["stop_ratio"]:
-                    # XXX: This should just be returned in the RPC Response, no event
-                    return
-
-        if self.options["auto_managed"]:
-            # This torrent is to be auto-managed by lt queueing
-            self.handle.auto_managed(True)
-
-        try:
-            self.handle.resume()
-        except RuntimeError as ex:
-            log.debug("Unable to resume torrent: %s", ex)
+        self.error_statusmsg = None
+        self.set_status_message()
+        self.update_state()
 
     def connect_peer(self, peer_ip, peer_port):
         """Manually add a peer to the torrent
@@ -1131,6 +1132,7 @@ class Torrent(object):
         """
 
         def write_file(filepath, filedump):
+            """Write out the torrent file"""
             log.debug("Writing torrent file to: %s", filepath)
             try:
                 with open(filepath, "wb") as save_file:

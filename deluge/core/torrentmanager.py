@@ -1054,10 +1054,8 @@ class TorrentManager(component.Component):
             return
         # Set an Error message and pause the torrent
         alert_msg = decode_string(alert.message()).split(':', 1)[1].strip()
-        torrent.set_error_statusmsg("Failed to move download folder: %s" % alert_msg)
         torrent.moving_storage = False
-        torrent.pause()
-        torrent.update_state()
+        torrent.force_error_state("Failed to move download folder: %s" % alert_msg)
 
         if torrent_id in self.waiting_on_finish_moving:
             self.waiting_on_finish_moving.remove(torrent_id)
