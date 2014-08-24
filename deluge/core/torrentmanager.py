@@ -656,8 +656,10 @@ class TorrentManager(component.Component):
         # Create the state for each Torrent and append to the list
         for torrent in self.torrents.values():
             paused = False
-            if torrent.state in ["Paused", "Error"]:
+            if torrent.state == "Paused" or (torrent.state == "Error" and torrent.error_state_save):
                 paused = True
+            elif torrent.state == "Error" and not torrent.error_state_save:
+                torrent.error_statusmsg = None
 
             torrent_state = TorrentState(
                 torrent.torrent_id,
@@ -1147,7 +1149,7 @@ class TorrentManager(component.Component):
                 error_msg = "Missing or invalid torrent data!"
         else:
             error_msg = "Problem with resume data: %s" % decode_string(alert.message()).split(':', 1)[1].strip()
-        torrent.force_error_state(error_msg)
+        torrent.force_error_state(error_msg, restart_to_resume=True, save_state=False)
 
     def on_alert_file_renamed(self, alert):
         """Alert handler for libtorrent file_renamed_alert

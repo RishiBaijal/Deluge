@@ -251,6 +251,9 @@ class Torrent(object):
                 self.filename = filename
             self.error_statusmsg = None
 
+        self.error_state_save = False
+        self.error_restart_to_resume = False
+        self.error_was_paused = False
         self.statusmsg = None
         self.state = None
         self.moving_storage = False
@@ -615,7 +618,7 @@ class Torrent(object):
                 self.error_statusmsg = decode_string(status.error)
             else:
                 # This is not an lt Error so pause (save original status) and emit a state changed event.
-                self.options["add_paused"] = status.paused
+                self.error_was_paused = status.paused
                 if not status.paused:
                     self.handle.pause()
                 component.get("EventManager").emit(TorrentStateChangedEvent(self.torrent_id, "Error"))
@@ -648,16 +651,27 @@ class Torrent(object):
             message = "OK"
         self.statusmsg = message
 
-    def force_error_state(self, message):
+    def force_error_state(self, message, restart_to_resume=False, save_state=True, halt_resume_data_save=True):
         """Forces the torrent into an error state.
 
         For setting an error state not covered by libtorrent.
 
         Args:
             message (str): The error status message.
-
+            restart_to_resume (bool, optional): Prevent resuming clearing the error, only restarting
+                session can resume
+            save_state (bool, optional): Should this error be saved and re-applied on restart.
+            halt_resume_data_save (bool, optional): [UNUSED FOR NOW] Stop this torrent
+                from saving thus overwriting resume data.
         """
         self.error_statusmsg = message
+        self.error_restart_to_resume = restart_to_resume
+        self.error_state_save = save_state
+        self.update_state()
+
+    def clear_forced_error_state(self):
+        self.error_statusmsg = None
+        self.set_status_message()
         self.update_state()
 
     def get_eta(self):
@@ -1018,7 +1032,9 @@ class Torrent(object):
         """
         # Turn off auto-management so the torrent will not be unpaused by lt queueing
         self.handle.auto_managed(False)
-        if self.status.paused:
+        if self.state == "Error":
+            return False
+        elif self.status.paused:
             # This torrent was probably paused due to being auto managed by lt
             # Since we turned auto_managed off, we should update the state which should
             # show it as 'Paused'.  We need to emit a torrent_paused signal because
@@ -1037,7 +1053,7 @@ class Torrent(object):
         """Resumes this torrent."""
         if self.status.paused and self.status.auto_managed:
             log.debug("Resume not possible for auto-managed torrent!")
-        elif self.error_statusmsg and self.options["add_paused"]:
+        elif self.error_statusmsg and self.error_was_paused:
             log.debug("Resume skipped for error'd torrent as it was originally paused.")
         elif (self.status.is_finished and self.options["stop_at_ratio"] and
                 self.get_ratio() >= self.options["stop_ratio"]):
@@ -1051,10 +1067,9 @@ class Torrent(object):
             except RuntimeError, ex:
                 log.debug("Unable to resume torrent: %s", ex)
 
-        # Reset the status message just in case of resuming an Error'd torrent
-        self.error_statusmsg = None
-        self.set_status_message()
-        self.update_state()
+        if self.error_statusmsg and not self.error_restart_to_resume:
+            # Reset the status message just in case of resuming an Error'd torrent
+            self.clear_forced_error_state()
 
     def connect_peer(self, peer_ip, peer_port):
         """Manually add a peer to the torrent
@@ -1197,14 +1212,21 @@ class Torrent(object):
     def force_recheck(self):
         """Forces a recheck of the torrent's pieces"""
         paused = self.status.paused
+
+        if self.error_statusmsg:
+            self.clear_forced_error_state()
+            paused = self.error_was_paused
+
         try:
             self.handle.force_recheck()
             self.handle.resume()
         except RuntimeError as ex:
             log.debug("Unable to force recheck: %s", ex)
             return False
+
         self.forcing_recheck = True
         self.forcing_recheck_paused = paused
+
         return True
 
     def rename_files(self, filenames):
