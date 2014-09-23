@@ -374,6 +374,7 @@ class Torrent(object):
             # reset all the piece priorities
             self.set_file_priorities(self.options["file_priorities"])
             return
+        self.handle.read_piece(0)
         if not self.has_metadata:
             return
         if self.get_status(["storage_mode"])["storage_mode"] == "compact":
@@ -614,6 +615,7 @@ class Torrent(object):
             self.state = "Error"
             # auto-manage status will be reverted upon resuming.
             self.handle.auto_managed(False)
+            log.debug("error paused: %s", status.paused)
             if status.error:
                 self.error_statusmsg = decode_string(status.error)
             else:
@@ -1214,13 +1216,15 @@ class Torrent(object):
         """Forces a recheck of the torrent's pieces"""
         paused = self.status.paused
 
-        if self.error_statusmsg:
-            self.clear_forced_error_state()
-            paused = self.error_was_paused
-
         try:
             self.handle.force_recheck()
+            if self.error_statusmsg:
+                log.debug("SDFASDFS")
+                self.clear_forced_error_state()
+                paused = self.error_was_paused
+
             self.handle.resume()
+
         except RuntimeError as ex:
             log.debug("Unable to force recheck: %s", ex)
             return False
