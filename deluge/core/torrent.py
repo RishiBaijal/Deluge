@@ -633,7 +633,8 @@ class Torrent(object):
             self.state = LT_TORRENT_STATE_MAP.get(str(status.state), str(status.state))
 
         if log.isEnabledFor(logging.DEBUG):
-            log.debug("State from lt was: %s | Session is paused: %s", status.state, session_is_paused)
+            log.debug("State from lt was: %s | Session is paused: %s",
+                      "error" if status.error else status.state, session_is_paused)
             log.debug("Torrent state set to '%s' (%s)", self.state, self.torrent_id)
             if self.error_statusmsg:
                 log.debug("Torrent Error state message: %s", self.error_statusmsg)
