@@ -612,10 +612,14 @@ class Torrent(object):
         session_is_paused = component.get("Core").session.is_paused()
 
         if status.error or self.error_statusmsg:
+            # Save the paused state to restore with force_recheck
+            if self.state in ["Paused", "Queued"]:
+                self.error_was_paused = True
+            log.debug("error was state: %s, soo.. %s", self.state, self.error_was_paused)
             self.state = "Error"
             # auto-manage status will be reverted upon resuming.
             self.handle.auto_managed(False)
-            log.debug("error paused: %s", status.paused)
+
             if status.error:
                 self.error_statusmsg = decode_string(status.error)
             else:
@@ -675,7 +679,9 @@ class Torrent(object):
     def clear_forced_error_state(self):
         self.error_statusmsg = None
         self.set_status_message()
-        self.update_state()
+        if not self.error_was_paused and self.options["auto_managed"]:
+            self.handle.auto_managed(True)
+        self.error_was_paused = False
 
     def get_eta(self):
         """Get the ETA for this torrent.
@@ -1214,15 +1220,14 @@ class Torrent(object):
 
     def force_recheck(self):
         """Forces a recheck of the torrent's pieces"""
-        paused = self.status.paused
+        if self.error_statusmsg:
+            paused = self.error_was_paused
+            self.clear_forced_error_state()
+        else:
+            paused = self.status.paused
 
         try:
             self.handle.force_recheck()
-            if self.error_statusmsg:
-                log.debug("SDFASDFS")
-                self.clear_forced_error_state()
-                paused = self.error_was_paused
-
             self.handle.resume()
 
         except RuntimeError as ex:

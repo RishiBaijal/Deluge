@@ -972,6 +972,7 @@ class TorrentManager(component.Component):
         # if necessary
         if torrent.forcing_recheck:
             torrent.forcing_recheck = False
+            log.debug("alert check pause %s", torrent.forcing_recheck_paused)
             if torrent.forcing_recheck_paused:
                 torrent.handle.pause()
 
