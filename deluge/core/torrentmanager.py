@@ -496,10 +496,12 @@ class TorrentManager(component.Component):
             handle.queue_position_top()
 
         component.resume("AlertManager")
-
-        # Resume the torrent if needed
-        if not options["add_paused"]:
+        # Resume the torrent if needed but only if no error status
+        if not options["add_paused"] and not torrent.error_statusmsg:
             torrent.resume()
+        elif torrent.error_statusmsg and resume_data:
+            # Store the orignal resume_data in case there was no issue and data was simply missing.
+            self.resume_data[torrent.torrent_id] = resume_data
 
         # Add to queued torrents set
         self.queued_torrents.add(torrent.torrent_id)

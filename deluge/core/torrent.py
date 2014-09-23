@@ -1119,8 +1119,15 @@ class Torrent(object):
             None: The response with resume data is returned in a libtorrent save_resume_data_alert.
 
         """
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("Requesting save_resume_data for torrent: %s", self.torrent_id)
         flags = lt.save_resume_flags_t.flush_disk_cache if flush_disk_cache else 0
-        self.handle.save_resume_data(flags)
+        # Don't generate fastresume data if torrent is in a Deluge Error state.
+        if self.error_statusmsg:
+            component.get("TorrentManager").waiting_on_resume_data[self.torrent_id].errback(
+                "Skipped creating resume_data while in Error state")
+        else:
+            self.handle.save_resume_data(flags)
 
     def write_torrentfile(self, filename=None, filedump=None):
         """Writes the torrent file to the state dir and optional 'copy of' dir.
