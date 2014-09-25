@@ -236,11 +236,6 @@ class Torrent(object):
             self.set_trackers(state.trackers)
             self.filename = state.filename
             self.is_finished = state.is_finished
-            last_sess_prepend = "[Error from Previous Session] "
-            if state.error_statusmsg and not state.error_statusmsg.startswith(last_sess_prepend):
-                self.error_statusmsg = last_sess_prepend + state.error_statusmsg
-            else:
-                self.error_statusmsg = state.error_statusmsg
         else:
             self.trackers = [tracker for tracker in self.handle.trackers()]
             self.is_finished = False
@@ -249,8 +244,8 @@ class Torrent(object):
                 self.filename = self.torrent_id
             else:
                 self.filename = filename
-            self.error_statusmsg = None
 
+        self.error_statusmsg = None
         self.error_state_save = False
         self.error_restart_to_resume = False
         self.error_was_paused = False
@@ -658,7 +653,7 @@ class Torrent(object):
             message = "OK"
         self.statusmsg = message
 
-    def force_error_state(self, message, restart_to_resume=False, save_state=True, halt_resume_data_save=True):
+    def force_error_state(self, message, restart_to_resume=False, halt_resume_data_save=True):
         """Forces the torrent into an error state.
 
         For setting an error state not covered by libtorrent.
@@ -667,13 +662,11 @@ class Torrent(object):
             message (str): The error status message.
             restart_to_resume (bool, optional): Prevent resuming clearing the error, only restarting
                 session can resume
-            save_state (bool, optional): Should this error be saved and re-applied on restart.
             halt_resume_data_save (bool, optional): [UNUSED FOR NOW] Stop this torrent
                 from saving thus overwriting resume data.
         """
         self.error_statusmsg = message
         self.error_restart_to_resume = restart_to_resume
-        self.error_state_save = save_state
         self.update_state()
 
     def clear_forced_error_state(self):
