@@ -247,7 +247,7 @@ class Torrent(object):
 
         self.error_statusmsg = None
         self.error_state_save = False
-        self.error_restart_to_resume = False
+        self.error_restart_to_resume = True
         self.error_was_paused = False
         self.statusmsg = None
         self.state = None
@@ -653,7 +653,7 @@ class Torrent(object):
             message = "OK"
         self.statusmsg = message
 
-    def force_error_state(self, message, restart_to_resume=False, halt_resume_data_save=True):
+    def force_error_state(self, message, restart_to_resume=True):
         """Forces the torrent into an error state.
 
         For setting an error state not covered by libtorrent.
@@ -661,9 +661,7 @@ class Torrent(object):
         Args:
             message (str): The error status message.
             restart_to_resume (bool, optional): Prevent resuming clearing the error, only restarting
-                session can resume
-            halt_resume_data_save (bool, optional): [UNUSED FOR NOW] Stop this torrent
-                from saving thus overwriting resume data.
+                session can resume.
         """
         self.error_statusmsg = message
         self.error_restart_to_resume = restart_to_resume
@@ -672,6 +670,7 @@ class Torrent(object):
     def clear_forced_error_state(self):
         self.error_statusmsg = None
         self.set_status_message()
+        self.error_restart_to_resume = True
         if not self.error_was_paused and self.options["auto_managed"]:
             self.handle.auto_managed(True)
         self.error_was_paused = False
@@ -1140,7 +1139,7 @@ class Torrent(object):
             log.debug("Requesting save_resume_data for torrent: %s", self.torrent_id)
         flags = lt.save_resume_flags_t.flush_disk_cache if flush_disk_cache else 0
         # Don't generate fastresume data if torrent is in a Deluge Error state.
-        if self.error_statusmsg:
+        if self.error_statusmsg and not self.error_restart_to_resume:
             component.get("TorrentManager").waiting_on_resume_data[self.torrent_id].errback(
                 "Skipped creating resume_data while in Error state")
         else:
