@@ -491,16 +491,16 @@ class TorrentManager(component.Component):
 
         # Add the torrent object to the dictionary
         self.torrents[torrent.torrent_id] = torrent
+        if resume_data:
+            self.resume_data[torrent.torrent_id] = resume_data
+
         if self.config["queue_new_to_top"]:
             handle.queue_position_top()
 
         component.resume("AlertManager")
         # Resume the torrent if needed but only if no error status
-        if not options["add_paused"] and not torrent.error_statusmsg:
+        if not options["add_paused"]:
             torrent.resume()
-        elif torrent.error_statusmsg and resume_data:
-            # Store the orignal resume_data in case there was no issue and data was simply missing.
-            self.resume_data[torrent.torrent_id] = resume_data
 
         # Add to queued torrents set
         self.queued_torrents.add(torrent.torrent_id)
@@ -1111,8 +1111,7 @@ class TorrentManager(component.Component):
             torrent_id = str(alert.handle.info_hash())
         except RuntimeError:
             return
-
-        if torrent_id in self.torrents:
+        if torrent_id in self.torrents and not self.torrents[torrent_id].error_statusmsg:
             # libtorrent add_torrent expects bencoded resume_data.
             self.resume_data[torrent_id] = lt.bencode(alert.resume_data)
 
