@@ -321,7 +321,7 @@ class TorrentManager(component.Component):
                 # XXX: Probably should raise an exception here...
                 return
 
-        if torrent_info is None and state:
+        if state:
             # We have no torrent_info so we need to add the torrent with information
             # from the state object.
 
@@ -350,8 +350,9 @@ class TorrentManager(component.Component):
             options["owner"] = state.owner
             options["name"] = state.name
 
-            torrent_info = self.get_torrent_info_from_file(
-                os.path.join(self.state_dir, state.torrent_id + ".torrent"))
+            if torrent_info is None:
+                torrent_info = self.get_torrent_info_from_file(
+                    os.path.join(self.state_dir, state.torrent_id + ".torrent"))
             if torrent_info:
                 add_torrent_params["ti"] = torrent_info
             elif state.magnet:

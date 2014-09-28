@@ -15,6 +15,7 @@ import deluge.tests.common as common
 from deluge._libtorrent import lt
 from deluge.core.core import Core
 from deluge.core.rpcserver import RPCServer
+from deluge.core.torrentmanager import TorrentState
 
 config_setup = False
 core = None
@@ -131,12 +132,19 @@ class TorrentTestCase(unittest.TestCase):
                        'peers': '\n\x00\x02\x0f=\xc6SC\x17]\xd8}\x7f\x00\x00\x01=\xc6', 'finished_time': 13399L,
                        'last_upload': 13399L, 'trackers': [[]], 'super_seeding': 0L,
                        'file sizes': [[512000L, 1411826586L]], 'last_download': 13399L}
+        torrent_state = TorrentState(
+            torrent_id='2dc5d0e71a66fe69649a640d39cb00a259704973',
+            filename='test_torrent.file.torrent',
+            name='',
+            save_path='/home/ubuntu/Downloads',
+            file_priorities=[1],
+            is_finished=True,
+        )
 
-        options = {}
         filename = os.path.join(os.path.dirname(__file__), "test_torrent.file.torrent")
-        torrent_id = self.torrentmanager.add(filedump=open(filename).read(), options=options, filename=filename,
+        filedump = open(filename).read()
+        torrent_id = self.torrentmanager.add(state=torrent_state, filedump=filedump,
                                              resume_data=lt.bencode(resume_data))
-
         torrent = self.torrentmanager.torrents[torrent_id]
         time.sleep(0.1)  # Delay to wait for alert from lt
 
